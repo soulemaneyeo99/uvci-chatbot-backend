@@ -213,15 +213,15 @@ def generate_response_stream(
             return "Désolé, je rencontre un problème technique. Veuillez réessayer ou contacter courrier@uvci.edu.ci"
     
     def generate_conversation_title(self, first_message: str) -> str:
-        """Génère titre conversation"""
+        """Génère un titre court pour une nouvelle conversation"""
         try:
             prompt = f"""Génère un titre court (3-6 mots) pour cette conversation UVCI.
-Réponds UNIQUEMENT avec le titre, sans guillemets.
+    Réponds UNIQUEMENT avec le titre, sans guillemets.
 
-Question: {first_message}
+    Question: {first_message}
 
-Titre:"""
-            
+    Titre:"""
+
             response = self.model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
@@ -229,12 +229,12 @@ Titre:"""
                     max_output_tokens=15,
                 )
             )
-            
+
             title = response.text.strip().strip('"').strip("'").rstrip('.')
             return title[:100]
-            
+
         except Exception as e:
-            logger.warning(f"⚠️  Erreur titre: {e}")
+            logger.warning(f"⚠️  Erreur génération titre: {e}")
             return first_message[:50] + "..." if len(first_message) > 50 else first_message
 
 # Instance globale
