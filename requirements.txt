@@ -13,6 +13,9 @@ google-generativeai==0.3.2
 PyPDF2==3.0.1
 pdfplumber==0.10.3
 
+# NumPy compatible avec ChromaDB (IMPORTANT)
+numpy==1.26.4
+
 # Embeddings et RAG
 sentence-transformers==2.3.1
 chromadb==0.4.22
