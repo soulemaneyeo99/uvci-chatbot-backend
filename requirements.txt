@@ -22,7 +22,7 @@ langchain-google-genai==0.0.6
 
 # Utilitaires
 python-dotenv==1.0.0
-pydantic==2.4.0
-pydantic-core==2.14.0
-pydantic-settings==2.0.1
+pydantic==2.5.3
+pydantic-settings==2.1.0
+uuid==1.30
 python-jose==3.3.0
