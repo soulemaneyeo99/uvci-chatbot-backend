@@ -1,28 +1,17 @@
-
-### 🛣️ ROUTES API (Endpoints)
-
-#### **19. Fichier `app/api/chat.py`**
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse, MessageSchema
 from app.services.ai_service import gemini_service
-from app.services.rag_service import rag_service
 from app.services.conversation_service import conversation_service
 from datetime import datetime
-import json
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 @router.post("/", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     """
-    Endpoint principal pour le chat
-    
-    - Reçoit un message de l'utilisateur
-    - Récupère le contexte RAG des documents
-    - Génère une réponse avec Gemini
-    - Sauvegarde dans l'historique
+    Endpoint principal pour le chat (version sans RAG)
     """
     try:
         # 1. Gérer la conversation
@@ -39,8 +28,9 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 db=db
             )
         
-        # 2. Récupérer le contexte RAG
-        rag_context, sources = rag_service.get_rag_context(request.message)
+        # 2. RAG désactivé pour économiser la mémoire
+        rag_context = None
+        sources = []
         
         # 3. Récupérer l'historique de conversation
         conversation_context = conversation_service.get_conversation_context(
@@ -51,7 +41,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         ai_response = gemini_service.generate_response(
             user_message=request.message,
             context=conversation_context,
-            rag_context=rag_context if rag_context else None
+            rag_context=rag_context
         )
         
         # 5. Sauvegarder le message de l'utilisateur
@@ -68,7 +58,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             conversation_id=conversation.id,
             role="assistant",
             content=ai_response,
-            sources=sources if sources else None,
+            sources=sources,
             db=db
         )
         
@@ -97,4 +87,3 @@ async def get_suggestions():
         "Quelles sont les conditions d'admission ?",
     ]
     return {"suggestions": suggestions}
-

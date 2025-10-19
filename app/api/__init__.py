@@ -1,4 +1,5 @@
-#### **23. Fichier `app/api/__init__.py`**
-from app.api import chat, history, documents
+from app.api import chat, history
+# Documents désactivés
+# from app.api import documents
 
-__all__ = ["chat", "history", "documents"]
+__all__ = ["chat", "history"]
