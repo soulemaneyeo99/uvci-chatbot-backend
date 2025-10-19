@@ -55,7 +55,7 @@ async def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
                 full_response += chunk
                 # Envoyer chaque chunk au frontend
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
-                await asyncio.sleep(0.01)  # Petit délai pour fluidité
+                await asyncio.sleep(0)  # Petit délai pour fluidité
             
             # 4. Sauvegarder les messages en DB
             user_message = conversation_service.add_message(

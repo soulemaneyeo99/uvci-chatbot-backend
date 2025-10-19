@@ -1,3 +1,4 @@
+import asyncio
 import google.generativeai as genai
 from app.config import settings
 from app.knowledge.uvci_complete_knowledge import get_uvci_knowledge
@@ -149,37 +150,43 @@ Assistant UVCI:"""
         
         return full_prompt
 
-    def generate_response_stream(
-        self, 
-        user_message: str, 
-        context: Optional[List[Dict]] = None,
-        rag_context: Optional[str] = None
-    ) -> Generator[str, None, None]:
-        """
-        Génère une réponse en streaming (NOUVEAU)
-        Yield chaque chunk de texte au fur et à mesure
-        """
-        try:
-            full_prompt = self._build_full_prompt(user_message, context)
-            
-            # Streaming depuis Gemini
-            response = self.model.generate_content(
-                full_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=2048,
-                ),
-                stream=True  # ✨ Active le streaming
-            )
-            
-            # Yield chaque chunk
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
-            
-        except Exception as e:
-            logger.error(f"❌ Erreur Gemini streaming: {str(e)}")
-            yield "Désolé, je rencontre un problème technique. Veuillez réessayer ou contacter courrier@uvci.edu.ci"
+    import asyncio
+
+def generate_response_stream(
+    self, 
+    user_message: str, 
+    context: Optional[List[Dict]] = None,
+    rag_context: Optional[str] = None
+) -> Generator[str, None, None]:
+    """
+    Génère une réponse en streaming fluide, compatible Render
+    """
+    try:
+        full_prompt = self._build_full_prompt(user_message, context)
+
+        # Démarre le flux Gemini
+        response = self.model.generate_content(
+            full_prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=2048,
+            ),
+            stream=True
+        )
+
+        # Émission manuelle des chunks avec petits délais
+        for chunk in response:
+            if hasattr(chunk, "text") and chunk.text:
+                yield chunk.text
+                # petit délai entre les chunks
+                asyncio.run(asyncio.sleep(0.01))
+
+        # Fin du flux
+        yield ": ping\n\n"    # assure la fermeture correcte
+
+    except Exception as e:
+        logger.error(f"❌ Erreur Gemini streaming: {str(e)}")
+        yield "Désolé, je rencontre un problème technique. Veuillez réessayer ou contacter courrier@uvci.edu.ci"
 
     def generate_response(
         self, 
