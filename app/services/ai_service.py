@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from app.config import settings
 from app.knowledge.uvci_complete_knowledge import get_uvci_knowledge
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Generator
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +18,7 @@ class GeminiService:
     def __init__(self):
         """Initialise Gemini avec connaissances UVCI"""
         try:
-            model_candidates = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-pro']
+            model_candidates = ['gemini-2.0-flash-exp', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-pro']
             
             model_name = None
             for candidate in model_candidates:
@@ -32,7 +32,7 @@ class GeminiService:
                     continue
             
             if not model_name:
-                model_name = 'gemini-2.5-flash'
+                model_name = 'gemini-2.0-flash-exp'
             
             self.model = genai.GenerativeModel(model_name)
             self.model_name = model_name
@@ -125,29 +125,71 @@ class GeminiService:
 🎯 TON OBJECTIF :
 Être LE meilleur assistant UVCI, avec des réponses ultra-précises, à jour, et utiles. Chaque étudiant qui te parle doit repartir satisfait et bien informé ! 🚀"""
 
-    def generate_response(
-        self, 
-        user_message: str, 
-        context: Optional[List[Dict]] = None,
-        rag_context: Optional[str] = None
+    def _build_full_prompt(
+        self,
+        user_message: str,
+        context: Optional[List[Dict]] = None
     ) -> str:
-        """Génère réponse avec connaissances UVCI"""
-        try:
-            system_prompt = self._build_system_prompt()
-            
-            history_messages = ""
-            if context:
-                for msg in context[-6:]:
-                    role = "Étudiant" if msg["role"] == "user" else "Assistant UVCI"
-                    history_messages += f"{role}: {msg['content']}\n"
-            
-            full_prompt = f"""{system_prompt}
+        """Construit le prompt complet avec historique"""
+        system_prompt = self._build_system_prompt()
+        
+        history_messages = ""
+        if context:
+            for msg in context[-6:]:
+                role = "Étudiant" if msg["role"] == "user" else "Assistant UVCI"
+                history_messages += f"{role}: {msg['content']}\n"
+        
+        full_prompt = f"""{system_prompt}
 
 {history_messages}
 
 Étudiant: {user_message}
 
 Assistant UVCI:"""
+        
+        return full_prompt
+
+    def generate_response_stream(
+        self, 
+        user_message: str, 
+        context: Optional[List[Dict]] = None,
+        rag_context: Optional[str] = None
+    ) -> Generator[str, None, None]:
+        """
+        Génère une réponse en streaming (NOUVEAU)
+        Yield chaque chunk de texte au fur et à mesure
+        """
+        try:
+            full_prompt = self._build_full_prompt(user_message, context)
+            
+            # Streaming depuis Gemini
+            response = self.model.generate_content(
+                full_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=2048,
+                ),
+                stream=True  # ✨ Active le streaming
+            )
+            
+            # Yield chaque chunk
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur Gemini streaming: {str(e)}")
+            yield "Désolé, je rencontre un problème technique. Veuillez réessayer ou contacter courrier@uvci.edu.ci"
+
+    def generate_response(
+        self, 
+        user_message: str, 
+        context: Optional[List[Dict]] = None,
+        rag_context: Optional[str] = None
+    ) -> str:
+        """Génère réponse complète sans streaming (pour compatibilité)"""
+        try:
+            full_prompt = self._build_full_prompt(user_message, context)
             
             response = self.model.generate_content(
                 full_prompt,
