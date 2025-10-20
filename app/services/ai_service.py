@@ -19,11 +19,13 @@ class GeminiService:
     def __init__(self):
         """Initialise Gemini avec connaissances UVCI"""
         try:
+            # NOUVEAU : Prioriser les modèles avec quota élevé
             model_candidates = [
-                'gemini-2.0-flash-exp',
-                'gemini-2.5-flash',
-                'gemini-2.5-pro',
-                'gemini-pro'
+                'gemini-1.5-flash',      # 1500 req/jour - MEILLEUR CHOIX
+                'gemini-1.5-flash-8b',   # 1500 req/jour
+                'gemini-1.5-pro',        # 50 req/jour mais plus puissant
+                'gemini-2.0-flash-exp',  # 50 req/jour
+                'gemini-pro'             # Fallback
             ]
             
             model_name = None
@@ -37,11 +39,12 @@ class GeminiService:
                     model_name = candidate
                     logger.info(f"✅ Modèle sélectionné: {model_name}")
                     break
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"⚠️ {candidate} non disponible: {e}")
                     continue
             
             if not model_name:
-                model_name = 'gemini-2.0-flash-exp'
+                raise Exception("Aucun modèle Gemini disponible")
             
             self.model = genai.GenerativeModel(model_name)
             self.model_name = model_name
@@ -120,9 +123,7 @@ Assistant UVCI:"""
         context: Optional[List[Dict]] = None,
         rag_context: Optional[str] = None
     ) -> Generator[str, None, None]:
-        """
-        Génère une réponse en streaming
-        """
+        """Génère une réponse en streaming"""
         try:
             full_prompt = self._build_full_prompt(user_message, context)
 
@@ -135,15 +136,20 @@ Assistant UVCI:"""
                 stream=True
             )
 
-            # Streaming des chunks
             for chunk in response:
                 if hasattr(chunk, "text") and chunk.text:
                     yield chunk.text
-                    time.sleep(0.01)  # Petit délai pour fluidité
+                    time.sleep(0.01)
 
         except Exception as e:
-            logger.error(f"❌ Erreur streaming: {str(e)}")
-            yield "Désolé, problème technique. Contactez courrier@uvci.edu.ci"
+            error_msg = str(e)
+            logger.error(f"❌ Erreur streaming: {error_msg}")
+            
+            # Message d'erreur selon le type
+            if "429" in error_msg or "quota" in error_msg.lower():
+                yield "⚠️ **Quota API dépassé**\n\nTrop de requêtes aujourd'hui. Réessayez demain ou contactez courrier@uvci.edu.ci"
+            else:
+                yield "⚠️ **Erreur technique**\n\nProblème de connexion. Contactez courrier@uvci.edu.ci"
 
     def generate_response(
         self, 
@@ -166,8 +172,13 @@ Assistant UVCI:"""
             return response.text.strip()
             
         except Exception as e:
-            logger.error(f"❌ Erreur Gemini: {str(e)}")
-            return "Désolé, problème technique. Contactez courrier@uvci.edu.ci"
+            error_msg = str(e)
+            logger.error(f"❌ Erreur Gemini: {error_msg}")
+            
+            if "429" in error_msg or "quota" in error_msg.lower():
+                return "⚠️ **Quota API dépassé**\n\nTrop de requêtes aujourd'hui. Réessayez demain ou contactez courrier@uvci.edu.ci"
+            else:
+                return "⚠️ **Erreur technique**\n\nProblème de connexion. Contactez courrier@uvci.edu.ci"
     
     def generate_conversation_title(self, first_message: str) -> str:
         """Génère un titre court pour conversation"""
@@ -191,7 +202,7 @@ Titre:"""
             return title[:100]
 
         except Exception as e:
-            logger.warning(f"⚠️  Erreur titre: {e}")
+            logger.warning(f"⚠️ Erreur titre: {e}")
             return first_message[:50] + "..." if len(first_message) > 50 else first_message
 
 # Instance globale
