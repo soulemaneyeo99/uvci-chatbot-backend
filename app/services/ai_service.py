@@ -19,32 +19,36 @@ class GeminiService:
     def __init__(self):
         """Initialise Gemini avec connaissances UVCI"""
         try:
-            # NOUVEAU : Prioriser les modèles avec quota élevé
+            # MODÈLES DISPONIBLES avec noms corrects pour API v1
             model_candidates = [
-                'gemini-1.5-flash',      # 1500 req/jour - MEILLEUR CHOIX
-                'gemini-1.5-flash-8b',   # 1500 req/jour
-                'gemini-1.5-pro',        # 50 req/jour mais plus puissant
-                'gemini-2.0-flash-exp',  # 50 req/jour
-                'gemini-pro'             # Fallback
+                'gemini-1.5-flash-latest',    # Quota 1500/jour - MEILLEUR
+                'gemini-1.5-pro-latest',      # Quota 50/jour mais puissant
+                'gemini-pro',                 # Quota 60/jour - Fallback stable
             ]
             
             model_name = None
+            last_error = None
+            
             for candidate in model_candidates:
                 try:
                     test_model = genai.GenerativeModel(candidate)
-                    test_model.generate_content(
+                    # Test simple pour vérifier disponibilité
+                    test_response = test_model.generate_content(
                         "Test",
-                        generation_config={'max_output_tokens': 5}
+                        generation_config={'max_output_tokens': 10}
                     )
                     model_name = candidate
                     logger.info(f"✅ Modèle sélectionné: {model_name}")
                     break
                 except Exception as e:
+                    last_error = str(e)
                     logger.warning(f"⚠️ {candidate} non disponible: {e}")
                     continue
             
             if not model_name:
-                raise Exception("Aucun modèle Gemini disponible")
+                error_msg = f"Aucun modèle Gemini disponible. Dernière erreur: {last_error}"
+                logger.error(f"❌ {error_msg}")
+                raise Exception(error_msg)
             
             self.model = genai.GenerativeModel(model_name)
             self.model_name = model_name
@@ -147,7 +151,9 @@ Assistant UVCI:"""
             
             # Message d'erreur selon le type
             if "429" in error_msg or "quota" in error_msg.lower():
-                yield "⚠️ **Quota API dépassé**\n\nTrop de requêtes aujourd'hui. Réessayez demain ou contactez courrier@uvci.edu.ci"
+                yield "⚠️ **Quota API dépassé**\n\nTrop de requêtes aujourd'hui. Réessayez plus tard ou contactez courrier@uvci.edu.ci"
+            elif "503" in error_msg or "overloaded" in error_msg.lower():
+                yield "⚠️ **Service temporairement surchargé**\n\nRéessayez dans quelques secondes."
             else:
                 yield "⚠️ **Erreur technique**\n\nProblème de connexion. Contactez courrier@uvci.edu.ci"
 
@@ -176,7 +182,9 @@ Assistant UVCI:"""
             logger.error(f"❌ Erreur Gemini: {error_msg}")
             
             if "429" in error_msg or "quota" in error_msg.lower():
-                return "⚠️ **Quota API dépassé**\n\nTrop de requêtes aujourd'hui. Réessayez demain ou contactez courrier@uvci.edu.ci"
+                return "⚠️ **Quota API dépassé**\n\nTrop de requêtes aujourd'hui. Réessayez plus tard ou contactez courrier@uvci.edu.ci"
+            elif "503" in error_msg or "overloaded" in error_msg.lower():
+                return "⚠️ **Service temporairement surchargé**\n\nRéessayez dans quelques secondes."
             else:
                 return "⚠️ **Erreur technique**\n\nProblème de connexion. Contactez courrier@uvci.edu.ci"
     
